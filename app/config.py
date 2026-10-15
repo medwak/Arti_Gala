@@ -25,6 +25,8 @@ class Settings:
     http_timeout_seconds: float = 30.0
     scrape_delay_seconds: float = 1.0
     smithsonian_api_key: str | None = None
+    # Europeana's public demo key works for light use; get your own free key for regular syncing.
+    europeana_api_key: str | None = "api2demo"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -39,4 +41,5 @@ class Settings:
             http_timeout_seconds=float(env.get("ARTI_HTTP_TIMEOUT", cls.http_timeout_seconds)),
             scrape_delay_seconds=float(env.get("ARTI_SCRAPE_DELAY", cls.scrape_delay_seconds)),
             smithsonian_api_key=env.get("ARTI_SMITHSONIAN_API_KEY") or None,
+            europeana_api_key=env.get("ARTI_EUROPEANA_API_KEY") or cls.europeana_api_key,
         )

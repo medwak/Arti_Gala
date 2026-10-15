@@ -20,6 +20,8 @@ MET = HolderIn(name="The Metropolitan Museum of Art", kind="public_museum", coun
 
 class MetConnector(Connector):
     name = "met"
+    label = "The Met (New York)"
+    continent = "North America"
     description = "The Metropolitan Museum of Art, New York (Collection API)"
     holder = MET
 

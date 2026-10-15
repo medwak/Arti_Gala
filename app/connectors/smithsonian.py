@@ -32,6 +32,10 @@ def _contents(items, label: str | None = None) -> list[str]:
 
 class SmithsonianConnector(Connector):
     name = "smithsonian"
+    label = "Smithsonian National Museum of African Art (Washington)"
+    continent = "North America"
+    api_key_setting = "smithsonian_api_key"
+    api_key_env = "ARTI_SMITHSONIAN_API_KEY"
     description = "Smithsonian National Museum of African Art (needs ARTI_SMITHSONIAN_API_KEY)"
     holder = NMAFA
 

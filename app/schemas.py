@@ -400,7 +400,31 @@ class InboundEvent(BaseModel):
 
 class SyncRequest(BaseModel):
     query: str = ""
+    country: str | None = Field(default=None, description="Limit the search to one sub-Saharan country")
     limit: int = Field(default=25, ge=1, le=500)
+
+
+class ConnectorInfo(BaseModel):
+    name: str
+    label: str
+    description: str
+    continent: str
+    available: bool
+    needs: str | None = Field(default=None, description="Environment variable to set before this source works")
+
+
+class SourceInfo(BaseModel):
+    source: str
+    label: str
+    continent: str
+    artifact_count: int
+    syncable: bool
+
+
+class CountryInfo(BaseModel):
+    country: str
+    region: str
+    artifact_count: int
 
 
 class SyncJobOut(ORM):

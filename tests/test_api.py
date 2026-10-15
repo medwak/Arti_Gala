@@ -222,3 +222,56 @@ def test_sync_failure_is_reported(client):
 def test_dashboard_served(client):
     r = client.get("/")
     assert r.status_code == 200 and "Arti Gala" in r.text
+
+
+def test_countries_list_all_49_with_counts(client, benin_head):
+    countries = client.get("/countries").json()
+    assert len(countries) == 49
+    by_name = {c["country"]: c for c in countries}
+    assert by_name["Nigeria"]["artifact_count"] == 1 and by_name["Nigeria"]["region"] == "West Africa"
+    assert by_name["Kenya"]["artifact_count"] == 0
+    assert {c["region"] for c in countries} == {"West Africa", "Central Africa", "East Africa", "Southern Africa"}
+
+
+def test_country_filter_is_exact(client):
+    client.post("/artifacts", json={"title": "Zarma blanket", "origin_country": "Niger"})
+    client.post("/artifacts", json={"title": "Ibeji", "origin_country": "Nigeria"})
+    titles = [a["title"] for a in client.get("/artifacts", params={"country": "Niger"}).json()["items"]]
+    assert titles == ["Zarma blanket"]
+
+
+def test_sources_list_connectors_and_stored_sources(client, benin_head):
+    sources = {s["source"]: s for s in client.get("/sources").json()}
+    assert {"europeana", "vam", "met", "artic", "cleveland", "smithsonian"} <= set(sources)
+    assert sources["vam"]["continent"] == "Europe" and sources["europeana"]["continent"] == "Europe"
+    assert sources["test"]["artifact_count"] == 1 and sources["test"]["syncable"] is False
+
+    connectors = {c["name"]: c for c in client.get("/sync/connectors").json()}
+    assert connectors["smithsonian"]["available"] is False
+    assert connectors["smithsonian"]["needs"] == "ARTI_SMITHSONIAN_API_KEY"
+    assert client.post("/sync/smithsonian", json={}).status_code == 422
+
+
+def test_sync_all_for_one_country(client, http_routes):
+    from .test_connectors import AIC_RESPONSE, VAM_DETAIL, VAM_SEARCH
+
+    seen = []
+
+    def vam(request):
+        seen.append(str(request.url))
+        return VAM_SEARCH
+
+    http_routes.update({
+        "https://api.artic.edu/api/v1/artworks/search": AIC_RESPONSE,
+        "https://api.vam.ac.uk/v2/objects/search": vam,
+        "https://api.vam.ac.uk/v2/object/O1234": VAM_DETAIL,
+    })
+    jobs = client.post("/sync/all", json={"country": "nigeria", "limit": 5}).json()
+    assert {j["connector"] for j in jobs} == {"europeana", "vam", "met", "artic", "cleveland"}  # no key for smithsonian
+    assert all(j["query"] == "Nigeria" for j in jobs)
+    status = {j["connector"]: j for j in client.get("/sync/jobs").json()}
+    assert status["vam"]["status"] == "succeeded" and status["vam"]["created"] == 1
+    assert status["met"]["status"] == "failed"  # not mocked: one source failing doesn't stop the others
+    assert "q_place_name=Nigeria" in seen[0]
+    assert client.get("/artifacts", params={"country": "Nigeria", "source": "vam"}).json()["total"] == 1
+    assert client.post("/sync/all", json={"country": "France"}).status_code == 422

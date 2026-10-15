@@ -24,6 +24,8 @@ PAGE_SIZE = 50
 
 class ArticConnector(Connector):
     name = "artic"
+    label = "Art Institute of Chicago"
+    continent = "North America"
     description = "Art Institute of Chicago (public API, includes provenance text)"
     holder = AIC
 

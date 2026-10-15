@@ -18,12 +18,24 @@ class Connector(ABC):
     """Fetches records from one source and yields them in normalized form."""
 
     name: str = ""
+    label: str = ""
     description: str = ""
+    continent: str = ""
     holder: HolderIn | None = None
+    # Settings attribute holding a required API key, if the source needs one.
+    api_key_setting: str | None = None
+    api_key_env: str | None = None
 
     def __init__(self, client: httpx.Client, settings: Settings) -> None:
         self.client = client
         self.settings = settings
+
+    @classmethod
+    def missing_key(cls, settings: Settings) -> str | None:
+        """Name of the environment variable to set, or None when the source is usable."""
+        if cls.api_key_setting and not getattr(settings, cls.api_key_setting, None):
+            return cls.api_key_env
+        return None
 
     @abstractmethod
     def fetch(self, query: str, limit: int) -> Iterator[ArtifactIn | AuctionLotIn]:

@@ -13,7 +13,7 @@ Data comes in four ways:
 
 | Technique | What it does |
 |---|---|
-| **APIs** | Connectors for the Met, the Art Institute of Chicago, the Cleveland Museum of Art and the Smithsonian National Museum of African Art |
+| **APIs** | **Europe:** Europeana (collections of many European museums in one search) and the Victoria and Albert Museum, London. **North America:** the Met, the Art Institute of Chicago, the Cleveland Museum of Art and the Smithsonian National Museum of African Art |
 | **Web scraping** | A configurable, robots.txt-respecting HTML scraper for auction results and collection sites that have no API |
 | **Webhooks** | Inbound (partners push signed records) and outbound (subscribe to signed event notifications, with retries and a delivery log) |
 | **WebSockets** | `/ws` streams every new artifact, sale, provenance step, case update and sync result live; the dashboard uses it |
@@ -39,9 +39,13 @@ pip install -r requirements-dev.txt
 python -m app.cli serve            # http://127.0.0.1:8000  (dashboard), /docs (API explorer)
 ```
 
-Pull data from the museum APIs, from the dashboard's **Data sources** tab or from the command line:
+The quickest way to fill the database: on the **Artifacts** tab, click a country under **Browse by country**, then click **Fetch … from all sources**. Every source is searched for that country and results appear in the live feed. The **source** dropdown narrows results to one museum or source, and the **Data sources** tab can sync one source or **All sources** with any query.
+
+From the command line:
 
 ```bash
+python -m app.cli sync europeana --query "Benin" --limit 50
+python -m app.cli sync vam --query "Ghana" --limit 50      # a bare country name searches by place of origin
 python -m app.cli sync met --query "Benin" --limit 50
 python -m app.cli sync artic --query "Yoruba" --limit 50
 python -m app.cli sync cleveland --query "mask" --limit 50
@@ -84,6 +88,7 @@ private) before publishing on Google Play.
 | `ARTI_DATABASE_URL` | `sqlite:///./arti_gala.db` | Any SQLAlchemy URL (e.g. PostgreSQL) |
 | `ARTI_INBOUND_WEBHOOK_SECRET` | unset (inbound disabled) | Shared secret partners sign pushes with |
 | `ARTI_SMITHSONIAN_API_KEY` | unset | Free key from https://api.data.gov/signup/ |
+| `ARTI_EUROPEANA_API_KEY` | `api2demo` (public demo key) | Free key from https://pro.europeana.eu/pages/get-api for regular use |
 | `ARTI_ALLOW_PRIVATE_WEBHOOK_TARGETS` | `false` | Allow webhook/scrape URLs on localhost/private networks |
 | `ARTI_WEBHOOK_MAX_ATTEMPTS` | `3` | Delivery attempts, with exponential backoff |
 | `ARTI_SCRAPE_DELAY` | `1.0` | Seconds between scraper requests to a site |
@@ -110,7 +115,9 @@ Full interactive docs are at `/docs`.
 
 **Holders & stats**: `GET /holders?kind=national_museum|private_collection|…`, `POST /holders`, `GET /stats`
 
-**Sync**: `GET /sync/connectors`, `POST /sync/{connector}`, `POST /sync/scrape`, `GET /sync/jobs/{id}`
+**Countries & sources**: `GET /countries` (all 49 countries by region, with artifact counts), `GET /sources` (every source with its continent and artifact count)
+
+**Sync**: `GET /sync/connectors`, `POST /sync/{connector}`, `POST /sync/all` (every source at once), `POST /sync/scrape`, `GET /sync/jobs/{id}`. Sync bodies take `query`, `limit` and an optional `country`.
 
 ## Realtime: WebSocket
 
@@ -180,7 +187,7 @@ app/
   main.py            FastAPI app factory (lifespan binds the event bus + webhook dispatcher)
   models.py          Artifact, Holder, ProvenanceEvent, AuctionLot, LegalCase, webhooks, sync jobs
   regions.py         sub-Saharan country / culture / region classifier
-  connectors/        met, artic, cleveland, smithsonian API clients + configurable HTML scraper
+  connectors/        europeana, vam, met, artic, cleveland, smithsonian API clients + configurable HTML scraper
   services/          ingest (upserts), provenance parser, money parser, event bus, webhooks, sync runner
   api/               REST routes + /ws WebSocket
   static/index.html  dashboard (search, artifact journey/history, auctions, cases, live feed)

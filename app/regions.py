@@ -120,42 +120,68 @@ class Classification:
     matched: str
 
 
-def _build_patterns() -> list[tuple[re.Pattern[str], str | None, str | None, str]]:
-    entries: list[tuple[str, str | None, str | None]] = []
+def _build_patterns() -> list[tuple[re.Pattern[str], str | None, str | None, str, bool]]:
+    # (name, country, region, is_culture)
+    entries: list[tuple[str, str | None, str | None, bool]] = []
     for name, region in COUNTRIES.items():
-        entries.append((name, name, region))
+        entries.append((name, name, region, False))
     for alias, country in ALIASES.items():
-        entries.append((alias, country, COUNTRIES[country]))
+        entries.append((alias, country, COUNTRIES[country], False))
     for culture, country in CULTURES.items():
-        entries.append((culture, country, COUNTRIES[country]))
+        entries.append((culture, country, COUNTRIES[country], True))
     for name, region in SUBREGIONS.items():
-        entries.append((name, None, region))
+        entries.append((name, None, region, False))
     # Bare "Congo" is ambiguous between the two Congos.
-    entries.append(("Congo", None, CENTRAL))
+    entries.append(("Congo", None, CENTRAL, False))
     # Longest names first so "Democratic Republic of the Congo" wins over "Republic of the Congo".
     entries.sort(key=lambda e: len(e[0]), reverse=True)
     return [
-        (re.compile(r"(?<![\w-])" + re.escape(name) + r"(?![\w-])", re.IGNORECASE), country, region, name)
-        for name, country, region in entries
+        (re.compile(r"(?<![\w-])" + re.escape(name) + r"(?![\w-])", re.IGNORECASE), country, region, name, is_culture)
+        for name, country, region, is_culture in entries
     ]
 
 
 _PATTERNS = _build_patterns()
 
 
-def classify(*fields: str | None) -> Classification | None:
+def classify(*fields: str | None, places_only: bool = False) -> Classification | None:
     """Return where in sub-Saharan Africa the first matching field points, or None.
 
     Fields are tried in order, so pass the most reliable one (country) first.
+    ``places_only`` skips culture names; use it for free text such as titles,
+    where words like "Dan" or "Edo" are often just names.
     """
     for text in fields:
         if not text:
             continue
         cleaned = _EXCLUDE.sub(" ", text)
-        for pattern, country, region, name in _PATTERNS:
+        for pattern, country, region, name, is_culture in _PATTERNS:
+            if places_only and is_culture:
+                continue
             if pattern.search(cleaned):
                 return Classification(country=country, subregion=region or GENERIC, matched=name)
     return None
+
+
+def canonical_country(name: str | None) -> str | None:
+    """Exact (case-insensitive) country name or alias -> canonical country name."""
+    if not name:
+        return None
+    key = name.strip().lower()
+    for country in COUNTRIES:
+        if country.lower() == key:
+            return country
+    for alias, country in ALIASES.items():
+        if alias.lower() == key:
+            return country
+    return None
+
+
+def countries_by_region() -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    for country, region in COUNTRIES.items():
+        grouped.setdefault(region, []).append(country)
+    return {region: sorted(names) for region, names in grouped.items()}
 
 
 def is_sub_saharan(*fields: str | None) -> bool:

@@ -7,6 +7,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..models import Artifact, Holder
+from ..regions import canonical_country
 from ..schemas import (
     ArtifactDetail,
     ArtifactHistory,
@@ -73,7 +74,9 @@ def search_artifacts(
             )
         )
     if country:
-        stmt = stmt.where(Artifact.origin_country.ilike(f"%{country}%"))
+        exact = canonical_country(country)
+        # Exact match for known countries so "Niger" does not also return Nigeria.
+        stmt = stmt.where(Artifact.origin_country == exact if exact else Artifact.origin_country.ilike(f"%{country}%"))
     if region:
         stmt = stmt.where(Artifact.origin_region.ilike(f"%{region}%"))
     if culture:

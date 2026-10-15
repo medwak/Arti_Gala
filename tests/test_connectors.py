@@ -216,3 +216,79 @@ def test_scraper_respects_robots_txt():
         pass
     else:
         raise AssertionError("expected RobotsDisallowed")
+
+
+# ---------------------------------------------------------------- European sources
+
+from app.connectors.europeana import EuropeanaConnector  # noqa: E402
+from app.connectors.vam import VamConnector  # noqa: E402
+
+VAM_SEARCH = {
+    "info": {"record_count": 2, "pages": 1, "page": 1},
+    "records": [
+        {"systemNumber": "O1234", "objectType": "Mask", "_primaryTitle": "", "_primaryPlace": "Nigeria",
+         "_primaryDate": "ca. 1900", "_primaryMaker": {"name": "Yoruba", "association": "maker"},
+         "_images": {"_iiif_image_base_url": "https://framemark.vam.ac.uk/collections/2006AB1234/"}},
+        {"systemNumber": "O9999", "objectType": "Teapot", "_primaryPlace": "England"},
+    ],
+}
+VAM_DETAIL = {"record": {
+    "systemNumber": "O1234", "titles": [{"title": "Gelede mask"}], "summaryDescription": "<p>Carved mask.</p>",
+    "materialsAndTechniques": "Carved wood, pigment",
+    "placesOfOrigin": [{"place": {"text": "Nigeria"}, "association": {"text": "made"}}],
+    "productionDates": [{"date": {"text": "ca. 1900", "earliest": "1890-01-01", "latest": "1910-12-31"}}],
+    "objectHistory": "Collected in Abeokuta, Nigeria, 1905; bought from a dealer, London, 1923",
+}}
+
+
+def test_vam_connector_country_search_and_detail():
+    calls = []
+
+    def route(request):
+        calls.append(str(request.url))
+        return VAM_SEARCH
+
+    routes = {"https://api.vam.ac.uk/v2/objects/search": route, "https://api.vam.ac.uk/v2/object/O1234": VAM_DETAIL}
+    records = list(VamConnector(client_for(routes), SETTINGS).fetch("Nigeria", 10))
+    assert "q_place_name=Nigeria" in calls[0]
+    assert len(records) == 1  # English teapot dropped without fetching its detail
+    rec = records[0]
+    assert rec.title == "Gelede mask"
+    assert rec.holder.kind == "national_museum" and rec.holder.country == "United Kingdom"
+    assert (rec.year_start, rec.year_end) == (1890, 1910)
+    assert rec.description == "Carved mask."
+    assert rec.image_url == "https://framemark.vam.ac.uk/collections/2006AB1234/full/!600,600/0/default.jpg"
+    assert [p.event_type for p in rec.provenance] == ["collected", "acquired"]
+
+
+EUROPEANA_RESPONSE = {
+    "success": True, "itemsCount": 3, "totalResults": 3, "nextCursor": None,
+    "items": [
+        {"id": "/2048128/618580", "title": ["Ndop figure"], "dataProvider": ["Example Nationaal Museum"],
+         "country": ["Netherlands"], "edmPlaceLabel": [{"def": "Democratic Republic of the Congo"}],
+         "dcCreator": ["Kuba"], "year": ["1880"], "edmPreview": ["https://api.europeana.eu/thumbnail/x.jpg"],
+         "edmIsShownAt": ["https://museum.example/objects/1"], "dcTypeLangAware": {"en": ["statue"]}},
+        {"id": "/1/2", "title": ["Mask, Côte d'Ivoire"], "dataProvider": ["Musée Exemple"], "country": ["France"]},
+        {"id": "/1/3", "title": ["Portrait of Dan Edo"], "dataProvider": ["Some Gallery"], "country": ["Belgium"]},
+    ],
+}
+
+
+def test_europeana_connector_keeps_holding_museum():
+    routes = {"https://api.europeana.eu/record/v2/search.json": EUROPEANA_RESPONSE}
+    records = list(EuropeanaConnector(client_for(routes), SETTINGS).fetch("", 10))
+    # The third item only mentions "Dan"/"Edo" as personal names in its title, so it is skipped.
+    assert [r.title for r in records] == ["Ndop figure", "Mask, Côte d'Ivoire"]
+    ndop, mask = records
+    assert ndop.origin_country == "Democratic Republic of the Congo"
+    assert ndop.holder.name == "Example Nationaal Museum" and ndop.holder.kind == "national_museum"
+    assert ndop.holder.country == "Netherlands" and ndop.object_type == "statue" and ndop.year_start == 1880
+    assert mask.origin_country == "Côte d'Ivoire" and mask.holder.kind == "public_museum"
+
+
+def test_places_only_ignores_culture_words():
+    from app.regions import classify
+
+    assert classify("Portrait of Dan Edo", places_only=True) is None
+    assert classify("Portrait of Dan Edo").country is not None
+    assert classify("Mask from Gabon", places_only=True).country == "Gabon"

@@ -26,7 +26,9 @@
   .stat b { display: block; font-size: 20px; }
   .stat span { color: var(--muted); font-size: 13px; }
   main { display: grid; grid-template-columns: 1fr 320px; gap: 16px; padding: 0 16px 24px; }
+  main > * { min-width: 0; }
   @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  select { max-width: 100%; }
   nav { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
   nav button { background: none; border: 1px solid var(--line); color: var(--text); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
   nav button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -58,6 +60,17 @@
   .route span.arrow { color: var(--muted); }
   .hidden { display: none; }
   .pager { display: flex; gap: 8px; align-items: center; }
+  details.countries summary { cursor: pointer; font-weight: 600; }
+  .region { margin-top: 10px; }
+  .region h3 { font-size: 13px; color: var(--muted); margin: 0 0 6px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+  .chip .n { color: var(--muted); margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .chip.empty { opacity: .65; }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chip.active .n { color: #fff; }
+  .selected-country { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .selected-country b { font-size: 17px; }
 </style>
 </head>
 <body>
@@ -76,9 +89,19 @@
     </nav>
 
     <div id="tab-artifacts">
+      <details class="card countries" id="country-browser" open>
+        <summary>Browse by country</summary>
+        <div class="chips" style="margin-top:10px"><button type="button" class="chip active" data-country="">All countries <span class="n" id="all-count"></span></button></div>
+        <div id="country-regions"></div>
+      </details>
+      <div class="selected-country card hidden" id="selected-country">
+        <div><b id="selected-name"></b> <span class="muted" id="selected-count"></span></div>
+        <button type="button" class="primary" id="fetch-country">Fetch from all sources</button>
+      </div>
       <form class="filters" id="artifact-form">
+        <input type="hidden" name="country" id="country-input">
         <input name="q" placeholder="Search (e.g. Benin, mask, ivory)" size="24">
-        <input name="country" placeholder="Country" size="12">
+        <select name="source" id="source-select"><option value="">All sources</option></select>
         <input name="object_type" placeholder="Type (painting, ornament…)" size="16">
         <select name="holder_kind">
           <option value="">Any holder</option>
@@ -120,10 +143,11 @@
 
     <div id="tab-sync" class="hidden">
       <div class="card">
-        <h2>Pull from a museum API</h2>
+        <h2>Pull from museum APIs</h2>
         <form class="filters" id="sync-form">
           <select name="connector" id="connector-select"></select>
-          <input name="query" placeholder="Query (e.g. Yoruba)" size="20">
+          <select name="country" id="sync-country"><option value="">Any country</option></select>
+          <input name="query" placeholder="Query (e.g. Yoruba, mask)" size="20">
           <input name="limit" type="number" value="25" min="1" max="500" style="width:80px">
           <button class="primary">Start sync</button>
         </form>
@@ -187,7 +211,9 @@ async function loadArtifacts() {
         <div class="muted">${a.current_holder ? esc(a.current_holder.name) + " · " + esc(a.current_holder.kind.replace("_", " ")) : "Holder unknown"}</div>
         <div>${a.object_type ? `<span class="pill">${esc(a.object_type)}</span>` : ""}${a.auction_count ? `<span class="pill">${a.auction_count} auction(s)</span>` : ""}${a.case_count ? `<span class="pill">${a.case_count} case(s)</span>` : ""}</div>
       </div>
-    </div>`).join("") : `<p class="muted">No artifacts yet. Use “Data sources” to pull from a museum API.</p>`;
+    </div>`).join("") : `<p class="muted">${$("#country-input").value
+      ? `No artifacts from ${esc($("#country-input").value)} yet. Use the button above to fetch them from all sources.`
+      : "No artifacts yet. Pick a country above and fetch its artifacts, or use “Data sources”."}</p>`;
   $("#page-info").textContent = page.total ? `${offset + 1}–${Math.min(offset + LIMIT, page.total)} of ${page.total}` : "";
   $("#prev").disabled = offset === 0; $("#next").disabled = offset + LIMIT >= page.total;
   document.querySelectorAll(".artifact").forEach((el) => el.addEventListener("click", () => showArtifact(el.dataset.id)));
@@ -250,10 +276,75 @@ async function loadCases() {
 }
 $("#case-form").addEventListener("submit", (e) => { e.preventDefault(); loadCases(); });
 
+// ---------- countries & sources
+let countries = [];
+const groupBy = (items, key) => items.reduce((acc, it) => ((acc[it[key]] ||= []).push(it), acc), {});
+async function loadCountries() {
+  countries = await api("/countries");
+  const total = countries.reduce((n, c) => n + c.artifact_count, 0);
+  $("#all-count").textContent = total;
+  const selected = $("#country-input").value;
+  $("#country-regions").innerHTML = Object.entries(groupBy(countries, "region")).map(([region, list]) => `
+    <div class="region"><h3>${esc(region)}</h3><div class="chips">${list.map((c) => `
+      <button type="button" class="chip${c.artifact_count ? "" : " empty"}${c.country === selected ? " active" : ""}" data-country="${esc(c.country)}">${esc(c.country)}<span class="n">${c.artifact_count}</span></button>`).join("")}
+    </div></div>`).join("");
+  $("#country-browser .chip[data-country='']").classList.toggle("active", !selected);
+  if (!$("#sync-country").dataset.filled) {
+    $("#sync-country").insertAdjacentHTML("beforeend", Object.entries(groupBy(countries, "region")).map(([region, list]) =>
+      `<optgroup label="${esc(region)}">${list.map((c) => `<option>${esc(c.country)}</option>`).join("")}</optgroup>`).join(""));
+    $("#sync-country").dataset.filled = "1";
+  }
+  updateSelectedCountry();
+}
+function updateSelectedCountry() {
+  const name = $("#country-input").value;
+  $("#selected-country").classList.toggle("hidden", !name);
+  if (!name) return;
+  const info = countries.find((c) => c.country === name);
+  $("#selected-name").textContent = name;
+  $("#selected-count").textContent = info ? `${info.artifact_count} artifact(s) · ${info.region}` : "";
+  $("#fetch-country").textContent = `Fetch ${name}'s artifacts from all sources`;
+}
+$("#country-browser").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  $("#country-input").value = chip.dataset.country;
+  document.querySelectorAll("#country-browser .chip").forEach((c) => c.classList.toggle("active", c === chip));
+  updateSelectedCountry();
+  offset = 0;
+  loadArtifacts();
+});
+$("#fetch-country").addEventListener("click", async () => {
+  const country = $("#country-input").value;
+  const btn = $("#fetch-country");
+  btn.disabled = true;
+  try {
+    const jobs = await api("/sync/all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ country, limit: 25 }) });
+    btn.textContent = `Searching ${jobs.length} sources… results appear in the live feed`;
+  } catch (err) {
+    btn.textContent = "Could not start: " + err.message.slice(0, 80);
+  }
+  setTimeout(() => { btn.disabled = false; updateSelectedCountry(); }, 4000);
+});
+
+async function loadSources() {
+  const sources = await api("/sources");
+  const select = $("#source-select");
+  const current = select.value;
+  select.innerHTML = `<option value="">All sources</option>` + Object.entries(groupBy(sources, "continent")).map(([continent, list]) =>
+    `<optgroup label="${esc(continent)}">${list.map((s) => `<option value="${esc(s.source)}">${esc(s.label)} (${s.artifact_count})</option>`).join("")}</optgroup>`).join("");
+  select.value = current;
+}
+$("#source-select").addEventListener("change", () => { offset = 0; loadArtifacts(); });
+
 // ---------- sync
 async function loadSync() {
   const [connectors, jobs] = await Promise.all([api("/sync/connectors"), api("/sync/jobs")]);
-  $("#connector-select").innerHTML = connectors.filter((c) => c.name !== "scrape").map((c) => `<option value="${esc(c.name)}">${esc(c.description)}</option>`).join("");
+  const usable = connectors.filter((c) => c.available).length;
+  $("#connector-select").innerHTML = `<option value="all">All sources (${usable})</option>` +
+    Object.entries(groupBy(connectors, "continent")).map(([continent, list]) =>
+      `<optgroup label="${esc(continent)}">${list.map((c) =>
+        `<option value="${esc(c.name)}"${c.available ? "" : " disabled"}>${esc(c.label)}${c.available ? "" : ` (set ${esc(c.needs)})`}</option>`).join("")}</optgroup>`).join("");
   $("#jobs").innerHTML = `<tr><th>#</th><th>Source</th><th>Query</th><th>Status</th><th class="num">New</th><th class="num">Updated</th><th>Error</th></tr>` +
     jobs.map((j) => `<tr><td>${j.id}</td><td>${esc(j.connector)}</td><td>${esc(j.query || "")}</td><td>${esc(j.status)}</td><td class="num">${j.created}</td><td class="num">${j.updated}</td><td class="muted">${esc(j.error || "")}</td></tr>`).join("");
 }
@@ -262,7 +353,7 @@ $("#sync-form").addEventListener("submit", async (e) => {
   const f = new FormData(e.target);
   await api(`/sync/${encodeURIComponent(f.get("connector"))}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query: f.get("query"), limit: Number(f.get("limit")) }),
+    body: JSON.stringify({ query: f.get("query"), country: f.get("country") || null, limit: Number(f.get("limit")) }),
   });
   loadSync();
 });
@@ -298,11 +389,15 @@ function connect() {
     feed.prepend(item);
     while (feed.children.length > 100) feed.lastChild.remove();
     clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => { loadStats(); if (!$("#tab-sync").classList.contains("hidden")) loadSync(); }, 800);
+    refreshTimer = setTimeout(() => {
+      loadStats(); loadCountries(); loadSources();
+      if (!$("#tab-sync").classList.contains("hidden")) loadSync();
+      if (!$("#tab-artifacts").classList.contains("hidden") && m.event.startsWith("artifact")) loadArtifacts();
+    }, 800);
   };
 }
 
-loadStats(); loadArtifacts(); connect();
+loadStats(); loadCountries(); loadSources(); loadArtifacts(); connect();
 </script>
 </body>
 </html>

@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from ..connectors import CONNECTORS, HtmlScraper, ScrapeConfig
 from ..models import SyncJob
-from ..schemas import SyncJobOut, SyncRequest
+from ..regions import canonical_country
+from ..schemas import ConnectorInfo, SyncJobOut, SyncRequest
 from ..services.sync import run_sync
 from ..services.webhooks import validate_target_url
 from .deps import get_db
@@ -27,11 +28,26 @@ def _start(request: Request, background: BackgroundTasks, db: Session, name: str
     return job
 
 
-@router.get("/connectors")
-def list_connectors():
-    """Data sources that can be synced through their public APIs."""
-    return [{"name": c.name, "description": c.description} for c in CONNECTORS.values()] + [
-        {"name": "scrape", "description": HtmlScraper.description}
+def _query(body: SyncRequest) -> str:
+    """Combine the free-text query with the chosen country (a bare country searches by place)."""
+    if body.country is None:
+        return body.query
+    country = canonical_country(body.country)
+    if country is None:
+        raise HTTPException(422, f"{body.country!r} is not a sub-Saharan African country; see GET /countries")
+    return f"{body.query} {country}".strip() if body.query else country
+
+
+@router.get("/connectors", response_model=list[ConnectorInfo])
+def list_connectors(request: Request):
+    """Museum APIs that can be synced, grouped by continent (Europe first)."""
+    settings = request.app.state.settings
+    return [
+        ConnectorInfo(
+            name=c.name, label=c.label, description=c.description, continent=c.continent,
+            available=c.missing_key(settings) is None, needs=c.missing_key(settings),
+        )
+        for c in CONNECTORS.values()
     ]
 
 
@@ -54,15 +70,30 @@ def start_scrape(
     return _start(request, background, db, f"scrape:{config.name}", factory, query, limit)
 
 
+@router.post("/all", response_model=list[SyncJobOut], status_code=202)
+def start_sync_all(body: SyncRequest, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
+    """Search every available source at once (one job per source). Sources missing an API key are skipped."""
+    query = _query(body)
+    settings = request.app.state.settings
+    return [
+        _start(request, background, db, name, factory, query, body.limit)
+        for name, factory in CONNECTORS.items()
+        if factory.missing_key(settings) is None
+    ]
+
+
 @router.post("/{connector}", response_model=SyncJobOut, status_code=202)
 def start_sync(
     connector: str, body: SyncRequest, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)
 ):
-    """Pull sub-Saharan objects from a museum API in the background."""
+    """Pull sub-Saharan objects from one museum API in the background."""
     factory = CONNECTORS.get(connector)
     if factory is None:
         raise HTTPException(404, f"unknown connector {connector!r}; see GET /sync/connectors")
-    return _start(request, background, db, connector, factory, body.query, body.limit)
+    missing = factory.missing_key(request.app.state.settings)
+    if missing:
+        raise HTTPException(422, f"{factory.label} needs an API key: set {missing} and restart the server")
+    return _start(request, background, db, connector, factory, _query(body), body.limit)
 
 
 @router.get("/jobs", response_model=list[SyncJobOut])

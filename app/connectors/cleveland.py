@@ -20,6 +20,8 @@ PAGE_SIZE = 50
 
 class ClevelandConnector(Connector):
     name = "cleveland"
+    label = "Cleveland Museum of Art"
+    continent = "North America"
     description = "Cleveland Museum of Art (Open Access API, structured provenance)"
     holder = CMA
 
