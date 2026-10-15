@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arti Gala</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%227%22 fill=%22%239a4a1c%22/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f7f5f0; --panel: #ffffff; --text: #1f1d1a; --muted: #6b665e; --line: #e2ddd3;
+    --accent: #9a4a1c; --accent-soft: #f3e4d8; --ok: #2f6b3a; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161412; --panel: #201d1a; --text: #ede8e0; --muted: #a39d92; --line: #36312b;
+      --accent: #e08a52; --accent-soft: #3a2a1f; --ok: #7cc489; --warn: #e2b04a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 16px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
+  header h1 { margin: 0; font-size: 22px; }
+  header p { margin: 0; color: var(--muted); }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; min-width: 110px; }
+  .stat b { display: block; font-size: 20px; }
+  .stat span { color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: 1fr 320px; gap: 16px; padding: 0 16px 24px; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  nav { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+  nav button { background: none; border: 1px solid var(--line); color: var(--text); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+  nav button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  form.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  input, select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); min-width: 0; }
+  button.primary { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 6px 14px; cursor: pointer; font: inherit; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .artifact { display: grid; grid-template-columns: 72px 1fr; gap: 12px; cursor: pointer; }
+  .artifact img, .thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; background: var(--accent-soft); }
+  .muted { color: var(--muted); font-size: 13px; }
+  .pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); margin-right: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; }
+  aside h2, section h2 { font-size: 16px; margin: 0 0 8px; }
+  #feed { max-height: 70vh; overflow-y: auto; }
+  .feed-item { border-left: 3px solid var(--accent); padding: 4px 8px; margin-bottom: 8px; font-size: 13px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 6px; }
+  .dot.on { background: var(--ok); }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); width: min(900px, calc(100vw - 32px)); max-height: 90vh; padding: 0; }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .dialog-body { padding: 16px; overflow-y: auto; max-height: 85vh; }
+  .timeline { list-style: none; padding: 0; margin: 0; border-left: 2px solid var(--accent); }
+  .timeline li { margin: 0 0 10px 12px; position: relative; }
+  .timeline li::before { content: ""; position: absolute; left: -18px; top: 7px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+  .route { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .route span.arrow { color: var(--muted); }
+  .hidden { display: none; }
+  .pager { display: flex; gap: 8px; align-items: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Arti Gala</h1>
+  <p>Sub-Saharan African artifacts: where they are, where they have been, what they sold for, and the cases around them.</p>
+</header>
+<div class="stats" id="stats"></div>
+<main>
+  <section>
+    <nav>
+      <button data-tab="artifacts" class="active">Artifacts</button>
+      <button data-tab="auctions">Auctions</button>
+      <button data-tab="cases">Cases</button>
+      <button data-tab="sync">Data sources</button>
+    </nav>
+
+    <div id="tab-artifacts">
+      <form class="filters" id="artifact-form">
+        <input name="q" placeholder="Search (e.g. Benin, mask, ivory)" size="24">
+        <input name="country" placeholder="Country" size="12">
+        <input name="object_type" placeholder="Type (painting, ornament…)" size="16">
+        <select name="holder_kind">
+          <option value="">Any holder</option>
+          <option value="national_museum">National museum</option>
+          <option value="public_museum">Public museum</option>
+          <option value="private_collection">Private collection</option>
+          <option value="dealer">Dealer</option>
+        </select>
+        <select name="has_cases"><option value="">Cases: any</option><option value="true">With cases</option></select>
+        <select name="has_auctions"><option value="">Auctions: any</option><option value="true">Sold at auction</option></select>
+        <button class="primary">Search</button>
+      </form>
+      <div id="artifacts"></div>
+      <div class="pager"><button id="prev">‹ Prev</button><span class="muted" id="page-info"></span><button id="next">Next ›</button></div>
+    </div>
+
+    <div id="tab-auctions" class="hidden">
+      <form class="filters" id="auction-form">
+        <input name="q" placeholder="Lot title / culture" size="20">
+        <input name="house" placeholder="Auction house" size="14">
+        <select name="status"><option value="">Any status</option><option>sold</option><option>upcoming</option><option>unsold</option><option>withdrawn</option></select>
+        <input name="min_price" type="number" placeholder="Min price" style="width:110px">
+        <input name="max_price" type="number" placeholder="Max price" style="width:110px">
+        <button class="primary">Filter</button>
+      </form>
+      <div id="auction-stats" class="muted"></div>
+      <div class="card table-wrap"><table id="auctions"></table></div>
+    </div>
+
+    <div id="tab-cases" class="hidden">
+      <form class="filters" id="case-form">
+        <input name="q" placeholder="Search cases" size="20">
+        <select name="status"><option value="">Any status</option><option>open</option><option>pending</option><option>resolved</option><option>returned</option><option>dismissed</option></select>
+        <select name="case_type"><option value="">Any type</option><option value="restitution_claim">Restitution claim</option><option value="repatriation">Repatriation</option><option value="litigation">Litigation</option><option value="theft_investigation">Theft investigation</option><option value="customs_seizure">Customs seizure</option></select>
+        <button class="primary">Filter</button>
+      </form>
+      <div id="cases"></div>
+    </div>
+
+    <div id="tab-sync" class="hidden">
+      <div class="card">
+        <h2>Pull from a museum API</h2>
+        <form class="filters" id="sync-form">
+          <select name="connector" id="connector-select"></select>
+          <input name="query" placeholder="Query (e.g. Yoruba)" size="20">
+          <input name="limit" type="number" value="25" min="1" max="500" style="width:80px">
+          <button class="primary">Start sync</button>
+        </form>
+        <p class="muted">Progress appears in the live feed. Scrapers and webhooks are configured through the API (see /docs).</p>
+      </div>
+      <div class="card table-wrap"><h2>Recent jobs</h2><table id="jobs"></table></div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h2><span class="dot" id="ws-dot"></span>Live feed</h2>
+      <div id="feed"><p class="muted">Waiting for events…</p></div>
+    </div>
+  </aside>
+</main>
+
+<dialog id="detail"><div class="dialog-body" id="detail-body"></div></dialog>
+
+<script>
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? esc(u) : "");
+const money = (v, cur) => (v == null ? "—" : `${cur ? cur + " " : ""}${Number(v).toLocaleString()}`);
+const params = (form) => {
+  const p = new URLSearchParams();
+  for (const [k, v] of new FormData(form)) if (v !== "") p.set(k, v);
+  return p;
+};
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.status === 204 ? null : r.json();
+}
+
+// ---------- tabs
+document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("active", x === b));
+  for (const t of ["artifacts", "auctions", "cases", "sync"]) $(`#tab-${t}`).classList.toggle("hidden", t !== b.dataset.tab);
+  ({ artifacts: loadArtifacts, auctions: loadAuctions, cases: loadCases, sync: loadSync })[b.dataset.tab]();
+}));
+
+// ---------- stats
+async function loadStats() {
+  const s = await api("/stats");
+  const tiles = [["Artifacts", s.artifacts], ["Holders", s.holders], ["Auction lots", s.auctions], ["Cases", s.cases], ["Open cases", s.open_cases]];
+  $("#stats").innerHTML = tiles.map(([k, v]) => `<div class="stat"><b>${esc(v)}</b><span>${esc(k)}</span></div>`).join("");
+}
+
+// ---------- artifacts
+let offset = 0; const LIMIT = 20;
+async function loadArtifacts() {
+  const p = params($("#artifact-form")); p.set("limit", LIMIT); p.set("offset", offset);
+  const page = await api(`/artifacts?${p}`);
+  $("#artifacts").innerHTML = page.items.length ? page.items.map((a) => `
+    <div class="card artifact" data-id="${a.id}">
+      ${a.image_url ? `<img src="${safeUrl(a.image_url)}" alt="" loading="lazy">` : `<div class="thumb"></div>`}
+      <div>
+        <b>${esc(a.title)}</b>
+        <div class="muted">${esc([a.culture, a.origin_country, a.date_text].filter(Boolean).join(" · "))}</div>
+        <div class="muted">${a.current_holder ? esc(a.current_holder.name) + " · " + esc(a.current_holder.kind.replace("_", " ")) : "Holder unknown"}</div>
+        <div>${a.object_type ? `<span class="pill">${esc(a.object_type)}</span>` : ""}${a.auction_count ? `<span class="pill">${a.auction_count} auction(s)</span>` : ""}${a.case_count ? `<span class="pill">${a.case_count} case(s)</span>` : ""}</div>
+      </div>
+    </div>`).join("") : `<p class="muted">No artifacts yet. Use “Data sources” to pull from a museum API.</p>`;
+  $("#page-info").textContent = page.total ? `${offset + 1}–${Math.min(offset + LIMIT, page.total)} of ${page.total}` : "";
+  $("#prev").disabled = offset === 0; $("#next").disabled = offset + LIMIT >= page.total;
+  document.querySelectorAll(".artifact").forEach((el) => el.addEventListener("click", () => showArtifact(el.dataset.id)));
+}
+$("#artifact-form").addEventListener("submit", (e) => { e.preventDefault(); offset = 0; loadArtifacts(); });
+$("#prev").addEventListener("click", () => { offset = Math.max(0, offset - LIMIT); loadArtifacts(); });
+$("#next").addEventListener("click", () => { offset += LIMIT; loadArtifacts(); });
+
+async function showArtifact(id) {
+  const [a, journey, history] = await Promise.all([api(`/artifacts/${id}`), api(`/artifacts/${id}/journey`), api(`/artifacts/${id}/history`)]);
+  $("#detail-body").innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:12px"><h2 style="margin:0">${esc(a.title)}</h2><button onclick="document.getElementById('detail').close()">Close</button></div>
+    <p class="muted">${esc([a.culture, a.origin_country, a.origin_region, a.date_text].filter(Boolean).join(" · "))}</p>
+    ${a.image_url ? `<img src="${safeUrl(a.image_url)}" alt="" style="max-width:100%;max-height:320px;border-radius:8px">` : ""}
+    <p>${esc(a.description || "")}</p>
+    <p class="muted">${esc([a.materials, a.dimensions].filter(Boolean).join(" · "))}</p>
+    <p>Now held by: <b>${a.current_holder ? esc(a.current_holder.name) : "unknown"}</b> ${a.source_url ? `· <a href="${safeUrl(a.source_url)}" target="_blank" rel="noopener">source record</a>` : ""}</p>
+    <h3>Where it has been</h3>
+    <div class="route">${journey.locations.map((l) => `<span class="pill">${esc(l)}</span>`).join('<span class="arrow">→</span>') || '<span class="muted">No locations recorded</span>'}</div>
+    <h3>History &amp; provenance</h3>
+    ${history.timeline.length ? `<ul class="timeline">${history.events.map((e, i) => `<li><b>${esc(history.timeline[i])}</b><div class="muted">${esc(e.description || "")}</div></li>`).join("")}</ul>` : '<p class="muted">No provenance recorded.</p>'}
+    ${a.history ? `<p style="white-space:pre-line">${esc(a.history)}</p>` : ""}
+    <h3>Auctions</h3>
+    ${a.auctions.length ? `<div class="table-wrap"><table><tr><th>Year</th><th>House</th><th>Lot</th><th class="num">Estimate</th><th class="num">Realized</th><th>Status</th></tr>${a.auctions.map((l) => `
+      <tr><td>${esc(l.sale_date || l.sale_year || "")}</td><td>${esc(l.auction_house)}</td><td>${esc(l.lot_number || "")}</td>
+      <td class="num">${l.estimate_low != null ? money(l.estimate_low, l.currency) + "–" + Number(l.estimate_high).toLocaleString() : "—"}</td>
+      <td class="num">${money(l.premium_price ?? l.hammer_price, l.currency)}</td><td>${esc(l.status)}</td></tr>`).join("")}</table></div>` : '<p class="muted">No recorded sales.</p>'}
+    <h3>Cases</h3>
+    ${a.cases.length ? a.cases.map(caseCard).join("") : '<p class="muted">No cases recorded.</p>'}`;
+  $("#detail").showModal();
+}
+
+// ---------- auctions
+async function loadAuctions() {
+  const p = params($("#auction-form"));
+  const [page, stats] = await Promise.all([api(`/auctions?limit=100&${p}`), api(`/auctions/stats?${p}`)]);
+  $("#auction-stats").textContent = `${stats.total_lots} lots · ` + stats.by_currency.map((c) => `${c.currency}: ${c.sold} sold, avg ${money(c.avg_price)}, max ${money(c.max_price)}`).join(" · ");
+  $("#auctions").innerHTML = `<tr><th>Date</th><th>Lot</th><th>House</th><th class="num">Estimate</th><th class="num">Realized</th><th>Status</th></tr>` +
+    page.items.map((l) => `<tr>
+      <td>${esc(l.sale_date || l.sale_year || "")}</td>
+      <td>${l.url ? `<a href="${safeUrl(l.url)}" target="_blank" rel="noopener">${esc(l.title || "Lot " + (l.lot_number || ""))}</a>` : esc(l.title || "Lot " + (l.lot_number || ""))}
+        ${l.artifact_id ? `<br><a href="#" data-artifact="${l.artifact_id}" class="muted">view artifact</a>` : ""}</td>
+      <td>${esc(l.auction_house)}</td>
+      <td class="num">${l.estimate_low != null ? money(l.estimate_low, l.currency) + "–" + Number(l.estimate_high).toLocaleString() : "—"}</td>
+      <td class="num">${money(l.premium_price ?? l.hammer_price, l.currency)}</td>
+      <td>${esc(l.status)}</td></tr>`).join("");
+  document.querySelectorAll("[data-artifact]").forEach((el) => el.addEventListener("click", (e) => { e.preventDefault(); showArtifact(el.dataset.artifact); }));
+}
+$("#auction-form").addEventListener("submit", (e) => { e.preventDefault(); loadAuctions(); });
+
+// ---------- cases
+const caseCard = (c) => `<div class="card"><b>${esc(c.title)}</b>
+  <div><span class="pill">${esc(c.case_type.replace("_", " "))}</span><span class="pill">${esc(c.status)}</span></div>
+  <div class="muted">${esc([c.claimant && "Claimant: " + c.claimant, c.respondent && "Respondent: " + c.respondent, c.jurisdiction, c.filed_date && "Filed " + c.filed_date].filter(Boolean).join(" · "))}</div>
+  <p>${esc(c.summary || "")}</p>${c.outcome ? `<p class="muted">Outcome: ${esc(c.outcome)}</p>` : ""}
+  ${c.url ? `<a href="${safeUrl(c.url)}" target="_blank" rel="noopener">Source</a>` : ""}</div>`;
+async function loadCases() {
+  const page = await api(`/cases?limit=100&${params($("#case-form"))}`);
+  $("#cases").innerHTML = page.items.map(caseCard).join("") || '<p class="muted">No cases recorded.</p>';
+}
+$("#case-form").addEventListener("submit", (e) => { e.preventDefault(); loadCases(); });
+
+// ---------- sync
+async function loadSync() {
+  const [connectors, jobs] = await Promise.all([api("/sync/connectors"), api("/sync/jobs")]);
+  $("#connector-select").innerHTML = connectors.filter((c) => c.name !== "scrape").map((c) => `<option value="${esc(c.name)}">${esc(c.description)}</option>`).join("");
+  $("#jobs").innerHTML = `<tr><th>#</th><th>Source</th><th>Query</th><th>Status</th><th class="num">New</th><th class="num">Updated</th><th>Error</th></tr>` +
+    jobs.map((j) => `<tr><td>${j.id}</td><td>${esc(j.connector)}</td><td>${esc(j.query || "")}</td><td>${esc(j.status)}</td><td class="num">${j.created}</td><td class="num">${j.updated}</td><td class="muted">${esc(j.error || "")}</td></tr>`).join("");
+}
+$("#sync-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  await api(`/sync/${encodeURIComponent(f.get("connector"))}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: f.get("query"), limit: Number(f.get("limit")) }),
+  });
+  loadSync();
+});
+
+// ---------- live feed (WebSocket)
+function describe(m) {
+  const d = m.data || {};
+  switch (m.event) {
+    case "artifact.created": return `New artifact: ${d.title} (${d.origin_country || d.culture || ""})`;
+    case "artifact.updated": return `Updated: ${d.title}`;
+    case "auction.created": return `Auction lot: ${d.title || d.auction_house} ${d.premium_price ?? d.hammer_price ? "— " + money(d.premium_price ?? d.hammer_price, d.currency) : ""}`;
+    case "auction.updated": return `Auction updated: ${d.title || d.auction_house} (${d.status})`;
+    case "case.created": return `New case: ${d.title} (${d.status})`;
+    case "case.updated": return `Case updated: ${d.title} → ${d.status}`;
+    case "provenance.added": return `Moved: ${d.artifact?.title} — ${d.event?.event_type} ${d.event?.holder_name || ""}`;
+    case "sync.finished": return `Sync ${d.connector} ${d.status}: ${d.created} new, ${d.updated} updated${d.error ? " — " + d.error : ""}`;
+    default: return m.event;
+  }
+}
+let refreshTimer;
+function connect() {
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+  ws.onopen = () => $("#ws-dot").classList.add("on");
+  ws.onclose = () => { $("#ws-dot").classList.remove("on"); setTimeout(connect, 3000); };
+  ws.onmessage = (ev) => {
+    const m = JSON.parse(ev.data);
+    if (["welcome", "pong", "subscribed"].includes(m.event)) return;
+    const feed = $("#feed");
+    if (feed.querySelector("p.muted")) feed.innerHTML = "";
+    const item = document.createElement("div");
+    item.className = "feed-item";
+    item.innerHTML = `<div>${esc(describe(m))}</div><div class="muted">${esc(new Date(m.ts).toLocaleTimeString())}</div>`;
+    feed.prepend(item);
+    while (feed.children.length > 100) feed.lastChild.remove();
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => { loadStats(); if (!$("#tab-sync").classList.contains("hidden")) loadSync(); }, 800);
+  };
+}
+
+loadStats(); loadArtifacts(); connect();
+</script>
+</body>
+</html>

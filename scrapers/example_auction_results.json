@@ -1,0 +1,23 @@
+{
+  "name": "example-auction-results",
+  "kind": "auction_lot",
+  "start_urls": ["https://auctions.example.com/results?department=african-art"],
+  "item_selector": "div.lot",
+  "fields": {
+    "lot_id": "@data-lot-id",
+    "lot_number": ".lot-number",
+    "title": "h3.lot-title",
+    "culture": ".lot-culture",
+    "sale_title": ".sale-name",
+    "sale_date": "time.sale-date@datetime",
+    "location": ".sale-location",
+    "estimate": ".estimate",
+    "price": ".price-realised",
+    "status": ".lot-status",
+    "url": "a.lot-link@href"
+  },
+  "next_page_selector": "a.next-page",
+  "max_pages": 5,
+  "auction_house": "Example Auctions",
+  "default_currency": "USD"
+}
