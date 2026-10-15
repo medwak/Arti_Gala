@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 10+: follow the system light/dark setting (the dashboard follows it too). -->
+    <style name="AppTheme" parent="android:Theme.DeviceDefault.DayNight">
+        <item name="android:colorPrimary">#9A4A1C</item>
+        <item name="android:colorPrimaryDark">#7A3A14</item>
+        <item name="android:colorAccent">#C0662E</item>
+    </style>
+</resources>

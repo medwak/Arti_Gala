@@ -36,6 +36,18 @@ def _run(settings: Settings, name: str, factory, query: str, limit: int) -> None
               f"updated={job.updated} skipped={job.skipped}" + (f" error={job.error}" if job.error else ""))
 
 
+def _lan_ip() -> str | None:
+    """This computer's address on the local network (no packets are sent)."""
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        try:
+            s.connect(("192.0.2.1", 80))
+            return s.getsockname()[0]
+        except OSError:
+            return None
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="arti-gala")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -61,6 +73,10 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "serve":
         import uvicorn
 
+        if args.host in ("0.0.0.0", "::"):
+            ip = _lan_ip()
+            if ip:
+                print(f"\n  On your phone (same Wi-Fi), open or enter in the Arti Gala app:  http://{ip}:{args.port}\n")
         uvicorn.run("app.main:create_app", factory=True, host=args.host, port=args.port)
     elif args.command == "sync":
         _run(settings, args.connector, CONNECTORS[args.connector], args.query, args.limit)

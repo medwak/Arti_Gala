@@ -50,6 +50,33 @@ ARTI_SMITHSONIAN_API_KEY=... python -m app.cli sync smithsonian --query "textile
 
 Run the tests with `pytest`. They use recorded API responses and need no network access.
 
+## Android app
+
+`android/` holds a small native Android app (APK, Android 5.0+) that shows the dashboard on your phone,
+with the live feed included. The data and syncing stay on the server, so the app needs a running server
+to connect to:
+
+1. On your computer, start the server so the phone can reach it: double-click `run-for-phone.bat`
+   (Windows) or run `./run-for-phone.sh`. It prints an address such as `http://192.168.1.20:8000`.
+   If Windows asks, allow Python through the firewall on private networks.
+2. Install `arti-gala-0.1.0.apk` on the phone. Allow "Install unknown apps" for your browser or file
+   manager when Android asks.
+3. Open Arti Gala, enter the address and tap **Connect**. Use the menu to reload or change the server.
+
+The phone and the computer must be on the same Wi-Fi, unless the server is hosted online.
+
+To rebuild the APK (Ubuntu/Debian, no Android Studio needed):
+
+```bash
+sudo apt install openjdk-17-jdk-headless aapt dalvik-exchange zipalign apksigner
+curl -L -o android-34.jar https://raw.githubusercontent.com/Sable/android-platforms/master/android-34/android.jar
+ANDROID_JAR=$PWD/android-34.jar android/build.sh     # -> android/build/arti-gala-0.1.0.apk
+```
+
+`android/arti-gala.keystore` (password `artigala`) signs the app. Keep using it so new builds install as
+updates over the old app. It's a convenience key for a self-distributed app; make your own (and keep it
+private) before publishing on Google Play.
+
 ## Configuration (environment variables)
 
 | Variable | Default | Purpose |
