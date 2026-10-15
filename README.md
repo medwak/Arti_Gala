@@ -24,6 +24,15 @@ about 130 cultures). Records that cannot be placed are rejected with HTTP 422.
 
 ## Quick start
 
+You need Python 3.11 or newer. Then:
+
+- **Windows:** double-click `run.bat`
+- **macOS / Linux:** run `./run.sh` in a terminal
+
+The first run installs dependencies (about a minute). Then open http://127.0.0.1:8000.
+
+Or set it up by hand:
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
